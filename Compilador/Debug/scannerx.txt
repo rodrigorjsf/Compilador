@@ -1,0 +1,50 @@
+/* -*- c-mode -*- */
+
+int main() {
+    int x,y,z,a;
+    float h;int c;float w,k;char p;
+    p='x';
+    c=1;
+    h=c;
+    p = 'x'*p;
+    x = y+z;
+    w = (5/x)+(((y)*8-5)* 7);
+    /** /** /*
+       teste &% 
+    ***/
+    
+
+     
+    do{
+        int ab;
+        char a;
+        a='s';
+        if(a>'x'){
+            float c;
+            if('x'>p){
+                int ola;
+                if('h'>p){
+                    char ola;
+                    if('x'>ola){
+                        int hehehe;
+			while(x>y){
+				int vaipegar, pegou;
+				vaipegar = pegou;
+			}
+                    }else{
+                    int a,g,h;
+                    float u,l,r;
+                    a=g+h;
+                    g=h+g;
+                    u=a-h;
+                    l=a*r;
+                    r=l/r;
+                    }
+                }
+            }
+        }
+
+    }while  (y<10);
+}
+
+

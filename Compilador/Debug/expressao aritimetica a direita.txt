@@ -1,0 +1,147 @@
+Token expr_arit(FILE * comp){  // <termo><expr_arit2>
+	//printf("\nEXPR_ARIT\n");
+    int aux , erro = 0;
+    fpos_t pos;
+    Token tk_aux, a1, a2;
+    if (error == 1){
+    	goto exp1_erro;
+    }
+    aux = verifica_fator(tk.cod);
+    if(aux == FALSE){
+        erro = 1;
+        goto exp1_erro;
+    }
+    a1 = termo(comp);
+    if(a1.cod == ERROR){
+        return a1;
+    }
+    tk_aux = tk;
+    fgetpos(comp, &pos);
+    tk = Scanner(comp);
+    a2 = expr_arit2(comp);
+    if(a2.cod != ERROR){
+        a1 = verifica_tipo_resultante(a1, a2);
+    }
+    else{
+        fsetpos(comp, &pos);
+        tk = tk_aux;
+        coluna = coluna -1;
+    }
+    exp1_erro:
+    if(error == 1){
+        a1.cod = ERROR;
+    }
+    if(erro == 1){
+        printf("\nERRO: Expressao Eritimetica mal formada na linha %i, coluna %i.\n",linha, coluna-1);
+        error = 1;
+        a1.cod = ERROR;
+    }
+    return a1;
+}
+
+Token expr_arit2(FILE * comp){  // "+" <termo><expr_arit2>   |"-" <termo><expr_arit2> | VAZIO
+    fpos_t pos;
+    Token tk_aux, aux1 ,aux2;
+    //printf("\nEXPR_ARIT2\n");
+    if(tk.cod == MAIS || tk.cod == MENOS){
+        //operador[op_count] = tk.cod;
+        //op_count++;
+        tk = Scanner(comp);
+        aux1 = termo(comp);
+        tk_aux = tk;
+        fgetpos(comp, &pos);
+        tk = Scanner(comp);
+        aux2 = expr_arit2(comp);
+        if(aux2.cod != ERROR){
+            aux1 = verifica_tipo_resultante(aux1, aux2);
+        }
+        else{
+            fsetpos(comp, &pos);
+            tk = tk_aux;
+            coluna = coluna -1;
+            goto end;
+        }
+        tk_aux = tk;
+        fgetpos(comp, &pos);
+        tk = Scanner(comp);
+        if(tk.cod != MAIS || tk.cod != MENOS ){
+            fsetpos(comp, &pos);
+            tk = tk_aux;
+            coluna = coluna -1;
+        }
+    }else {
+        aux1.cod = ERROR;
+    }
+    end:
+    return aux1;
+}
+Token termo(FILE * comp){  // <termo> "*" <fator> | <termo> “/” <fator> | <fator>
+	//printf("\nTERMO\n");
+	int aux;
+    fpos_t pos;
+    Token tk_aux, aux1, aux2;
+    aux = verifica_fator(tk.cod); //ATUAL
+    if (aux == TRUE){
+        aux1 = fator(comp);// (p)
+    }
+     else{
+        aux1.cod = ERROR;
+    }
+    if(aux1.cod != ERROR){
+        if(aux1.cod == IDENTIFICADOR){
+            if(busca_na_tabela(&aux1) == FALSE){
+                aux1.cod = ERROR;
+                return aux1;
+            }
+        }
+        tk_aux = tk;
+        fgetpos(comp, &pos);
+        tk = Scanner(comp);
+        if(tk.cod == MULT || tk.cod == BARRA){
+            while(tk.cod == MULT || tk.cod == BARRA){
+                tk = Scanner(comp);
+                aux2 = fator(comp);
+                if(aux2.cod != ERROR){
+                    if(aux2.cod == IDENTIFICADOR){
+                        if(busca_na_tabela(&aux2) == FALSE){
+                            aux2.cod = ERROR;
+                            return aux2;
+                        }
+                    }
+                    aux1 = verifica_tipo_resultante(aux1, aux2);
+                    if(aux1.cod == ERROR){
+                       goto ea_erro;
+                    }
+                }
+                else{
+                    fsetpos(comp, &pos);
+                    tk = tk_aux;
+                    coluna = coluna -1;
+                    goto ea_erro;
+                }
+                tk_aux = tk;
+                fgetpos(comp, &pos);
+                tk = Scanner(comp);
+                if(tk.cod != MULT && tk.cod != BARRA){
+                    fsetpos(comp, &pos);
+                    tk = tk_aux;
+                    coluna = coluna -1;
+                }
+            }
+        }
+        else{
+        fsetpos(comp, &pos);
+        tk = tk_aux;
+        coluna = coluna -1;
+        }
+    }else{
+        ea_erro:
+        if(error == 1){
+            aux1.cod = ERROR;
+            return aux1;
+        }
+        printf("\nERRO: Expressao Eritimetica mal formada na linha %i, coluna %i.\n",linha, coluna-1);
+        error = 1;
+    }
+    return aux1;
+}

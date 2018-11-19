@@ -1,0 +1,36 @@
+/* -*- c-mode -*- */
+
+int main() {
+    int x,y,z,a;
+    float h;int c;float w,k;char p;
+
+    c = 'x'*'2';
+    k = y+w;
+    w = (4*2*3/5); //5/x)+(((y)*8-5)* 7 3+(4*2)/13 (4*2)*(3/5)
+    /** /** /*
+       teste &% 
+    ***/
+
+	do{
+	
+	w = w + 1;
+
+	}while  (y<10);
+
+
+    y = x;
+
+    while (x>w*8) {
+       float w, x, y,a;
+        w = w +1;
+        y = x;
+    }
+    a = 0;
+
+    if (w != x)
+    {
+     int p;
+        p = 10;
+    }else
+        p = '1';
+}
