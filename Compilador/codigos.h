@@ -42,6 +42,7 @@
 #define ERROR_CHAR 200
 #define ERROR_SEMANTICO 201
 #define ERROR 404
+#define TMP 123
 
 
 typedef struct token {

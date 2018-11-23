@@ -4,10 +4,16 @@
 int linha;
 int coluna;
 int error;
-int cont;
+int cont, label_cont = 0, tmp_cont = 0, atr_cont = 0;
 int dec_var;
+int op_atual;
+int flag_print = 0;
+int fator_check = 0, fator_cont = 0,cont_it = 0, termo_check = 0, termo_int = 0;
 int escopo = 0;
-Token tk;
+char tipos_vtr [3][6] = { "Int", "Float", "Char" };  //PARA PRINTAR O TIPO DO ID OU VAR
+char tipos_op [4][6] = { "+", "-", "*", "/" };  //PARA PRINTAR O TIPO DO ID OU VAR
+char tipos_relacionail [6][6] = {"<", ">", "<=", ">=", "==", "!=" };  //PARA PRINTAR O TIPO DO ID OU VAR
+Token tk, g_tmp_var;
 Symbol *tabela;
 
 FILE * AbrirArquivo(char nome[]) {
@@ -15,7 +21,9 @@ FILE * AbrirArquivo(char nome[]) {
 	arq = fopen(nome, "r+b");
 	return arq;
 }
-
+enum tipos_de_variavel {Int, Float, Char}tiposVar; //PARA USAR EM tipos_vtr
+enum tipos_de_operador {mais, menos, mult, barra}tiposOp;
+enum tipos_de_op_relacional {menor, maior, menorigual, maiorigual, igualigual, diferente}tiposOpEr;
 //------------------ DECLARACOES DAS FUNCOES --------------------------------
 int verifica_reservadas(char lex[]);
 int verifica_char(char ch);
@@ -33,20 +41,23 @@ int verifica_op_relacional(int tipo);
 int verifica_bloco(int tipo);
 int verifica_expr_arit(int check);
 Token verifica_tipo_resultante(Token a1, Token a2);
+int verifica_tipo_atr(Token a1, Token a2);
 Symbol * fim_lista();
 void preencher_tabela(Token t);
 void destruir_escopo();
 void destruir_tabela();
-//Token covert_to_float(Token tken);
+void covert_to_float(Token *tken);
+char * gerador_de_label();
+char * gerador_de_var_tmp();
 int busca_na_tabela (Token *aux);
 int declara_variavel(FILE * comp);
 int iteracao(FILE * comp);
 int atribuicao(FILE * comp);
 Token expr_relacional(FILE * comp);
-Token expr_arit(FILE * comp);
-Token expr_arit2(FILE * comp);
-Token termo(FILE * comp);
-Token fator(FILE * comp);
+Token expr_arit(FILE * comp, Token *tk1);
+Token expr_arit2(FILE * comp, Token * tk1);
+Token termo(FILE * comp, Token * tk1);
+Token fator(FILE * comp, Token *tk1);
 int comando_basico(FILE * comp);
 int comando(FILE * comp);
 int bloco(FILE * comp);
@@ -259,6 +270,8 @@ Token verifica_tipo_resultante(Token a1, Token a2){
 						//a1 = covert_to_float(a1);
 					}
 				}
+			}else{
+				tk_aux = a1;
 			}
 		}
 		else if(a2.cod == VL_CHAR){
@@ -266,6 +279,9 @@ Token verifica_tipo_resultante(Token a1, Token a2){
 				printf("\nERRO na linha %i, coluna %i: Erro de semantica.2\n",linha, coluna-1);
 				error = 1;
 				tk_aux.cod = ERROR;
+			}
+			else{
+				tk_aux = a2;
 			}
 		}
 		else if(a2.cod == VL_FLOAT){
@@ -278,7 +294,8 @@ Token verifica_tipo_resultante(Token a1, Token a2){
 				if (a1.tipo == VL_INT){
 					a1.tipo = VL_FLOAT;
 					tk_aux = a1;
-					//a1 = covert_to_float(a1);
+				}else{
+					tk_aux = a2;
 				}
 			}
 
@@ -291,9 +308,10 @@ Token verifica_tipo_resultante(Token a1, Token a2){
 			}
 			else {
 				if(a1.tipo == VL_FLOAT){
-					//a2 = covert_to_float(a2); //USADO
+					covert_to_float(&a2);
 					tk_aux = a2;
-				}
+				}else
+					tk_aux = a2;
 			}
 		}
 	}else if(a1.cod == VL_CHAR){
@@ -303,11 +321,16 @@ Token verifica_tipo_resultante(Token a1, Token a2){
 				error = 1;
 				tk_aux.cod = ERROR;
 			}
+			else{
+				tk_aux = a1;
+			}
 		}
 		else if(a2.cod != VL_CHAR){
 			printf("\nERRO na linha %i, coluna %i: Erro de semantica.6\n",linha, coluna-1);
 			error = 1;
 			tk_aux.cod = ERROR;
+		}else{
+			tk_aux = a1;
 		}
 	}else if(a1.cod == VL_FLOAT){
 		if(a2.cod == IDENTIFICADOR){
@@ -316,9 +339,11 @@ Token verifica_tipo_resultante(Token a1, Token a2){
 				error = 1;
 				tk_aux.cod = ERROR;
 			}
-			if(a2.tipo == VL_INT){
+			else if(a2.tipo == VL_INT){
 				a2.tipo = VL_FLOAT;
 				tk_aux = a2;
+			}else{
+				tk_aux = a1;
 			}
 		}
 		else{
@@ -327,9 +352,11 @@ Token verifica_tipo_resultante(Token a1, Token a2){
 				error = 1;
 				tk_aux.cod = ERROR;
 			}
-			if(a2.cod == VL_INT){
-				//a2 = covert_to_float(a2);//USADO
-				tk_aux = a2;
+			else if(a2.cod == VL_INT){
+				covert_to_float(&a2);
+				tk_aux = a1;
+			}else{
+				tk_aux = a1;
 			}
 		}
 	}else if(a1.cod == VL_INT){
@@ -340,7 +367,9 @@ Token verifica_tipo_resultante(Token a1, Token a2){
 				tk_aux.cod = ERROR;
 			}
 			else if (a2.tipo == VL_FLOAT){
-				//a1 = covert_to_float(a1);//USADO
+				covert_to_float(&a1);//USADO
+				tk_aux = a1;
+			}else{
 				tk_aux = a1;
 			}
 		}
@@ -351,7 +380,7 @@ Token verifica_tipo_resultante(Token a1, Token a2){
 				tk_aux.cod = ERROR;
 			}
 			else if (a2.cod == VL_FLOAT){
-				//a1 = covert_to_float(a1);//USADO
+				covert_to_float(&a1);//USADO
 				tk_aux = a1;
 			}else{
 				tk_aux = a1;
@@ -363,8 +392,90 @@ Token verifica_tipo_resultante(Token a1, Token a2){
 	return tk_aux;
 }
 
+int verifica_tipo_atr(Token a1, Token a2){
+	int op;
+	//printf("\n opa %s %i %i l:%i c:%i\n", a1.lexema, a1.cod, a1.tipo, linha,coluna- 1);
+	if(a1.tipo == VL_INT){
+		if(a2.cod == IDENTIFICADOR){
+			if(a2.tipo != VL_INT){
+				op = FALSE;
+			}
+			else{
+				op = TRUE;
+			}
+
+		}
+		else if(a2.cod != VL_INT){
+			op = FALSE;
+		}
+		else{
+			op = TRUE;
+		}
+
+	}else if(a1.tipo == VL_CHAR){
+		if(a2.cod == IDENTIFICADOR){
+			if(a2.tipo != VL_CHAR){
+				op = FALSE;
+			}
+			else{
+				op = TRUE;
+			}
+
+		}
+		else if(a2.cod != VL_CHAR){
+			op = FALSE;
+		}
+		else{
+			op = TRUE;
+		}
+
+	}else{
+		if(a2.cod == IDENTIFICADOR){
+			if(a2.tipo == VL_CHAR){
+				op = FALSE;
+			}
+			else{
+				op = TRUE;
+			}
+
+		}
+		else if(a2.cod == VL_CHAR){
+			op = FALSE;
+		}
+		else{
+			op = TRUE;
+		}
+	}
+	return op;
+}
 
 //------------------------------------------------------------------------
+void covert_to_float(Token *tken){
+	tken->cod = VL_FLOAT;
+}
+
+char * gerador_de_label(){
+	char buf[5];
+	char * labbel;
+	labbel =(char*)calloc(5,sizeof(char));
+	sprintf(buf, "%i", label_cont);
+	strcpy(labbel,  "L");
+	strcat(labbel, buf);
+	label_cont++;
+	return labbel;
+}
+
+char * gerador_de_var_tmp(){
+	char buf[5];
+	char * tmp_var;
+	tmp_var = (char*)calloc(5,sizeof(char));
+	sprintf(buf, "%i", tmp_cont);
+	strcpy(tmp_var,  "T");
+	strcat(tmp_var, buf);
+	tmp_cont++;
+	return tmp_var;
+}
+
 Symbol * fim_lista(){
 	Symbol * p;
 	p = tabela;
@@ -404,7 +515,7 @@ void preencher_tabela(Token t){
 void destruir_escopo(){
 	Symbol *aux1, *aux2, *nova, *p;
 	aux1 = NULL;
-    /*printf("\n");
+	/*printf("\n");
 	printf("tabela: ");
 	while(tmp != NULL){
 		printf("[%s:%i]", tmp->lexema,tmp->escopo);
@@ -466,59 +577,59 @@ void destruir_tabela(){
 int busca_na_tabela (Token *aux)
 {
 
-   Symbol *p;
-   int op = TRUE, achou = FALSE, escopo_aux;
-   escopo_aux = escopo;
-   //printf("\nDA VEZ:  %s %i %i %i", aux->lexema,aux->cod,aux->tipo, escopo);
-   again:
-   p = tabela;
-   if (escopo_aux == 0){
-	   op = FALSE;
-	   goto fim_busca;
-   }
-   do{
-       if(strcmp(aux->lexema, p->lexema) == 0)
-       {
-            if(p->escopo == escopo_aux){
-                   achou = TRUE;
-                   //printf("\nDA VEZ aCHADO da tabela:  %s %i %i %i", p->lexema,p->escopo,p->tipo, escopo);
-                   aux->tipo = p->tipo;
-                   //printf("\nDA VEZ aCHADO:  %s %i %i %i", aux->lexema,aux->cod,aux->tipo, escopo);
-            }
-            else if(p->prox == NULL){
-            	//aux->tipo = 0;
-                op = FALSE;
-            }
-            else
-            {
-            	p = p->prox;
-            }
-       }
-       else if(p->prox == NULL)
-       {
-    	   //aux->tipo = 0;
-    	   op = FALSE;
-    	   break;
-       }
-       else
-       {
-    	   p = p->prox;
-       }
+	Symbol *p;
+	int op = TRUE, achou = FALSE, escopo_aux;
+	escopo_aux = escopo;
+	//printf("\nDA VEZ:  %s %i %i %i", aux->lexema,aux->cod,aux->tipo, escopo);
+	again:
+	p = tabela;
+	if (escopo_aux == 0){
+		op = FALSE;
+		goto fim_busca;
+	}
+	do{
+		if(strcmp(aux->lexema, p->lexema) == 0)
+		{
+			if(p->escopo == escopo_aux){
+				achou = TRUE;
+				//printf("\nDA VEZ aCHADO da tabela:  %s %i %i %i", p->lexema,p->escopo,p->tipo, escopo);
+				aux->tipo = p->tipo;
+				//printf("\nDA VEZ aCHADO:  %s %i %i %i", aux->lexema,aux->cod,aux->tipo, escopo);
+			}
+			else if(p->prox == NULL){
+				//aux->tipo = 0;
+				op = FALSE;
+			}
+			else
+			{
+				p = p->prox;
+			}
+		}
+		else if(p->prox == NULL)
+		{
+			//aux->tipo = 0;
+			op = FALSE;
+			break;
+		}
+		else
+		{
+			p = p->prox;
+		}
 
-   }while (p != NULL && achou == FALSE && op == TRUE);
+	}while (p != NULL && achou == FALSE && op == TRUE);
 
-   if(achou == FALSE && escopo_aux != 0 && dec_var == 0){
-	   escopo_aux--;
-	   op = TRUE;
-	   goto again;
-   }
-   if(achou == TRUE)
-   {
-	   //printf("\n %s %i %i %i", aux->lexema,aux->cod,aux->tipo, escopo_aux);
-       op = TRUE;
-   }
-   fim_busca:
-   return op;
+	if(achou == FALSE && escopo_aux != 0 && dec_var == 0){
+		escopo_aux--;
+		op = TRUE;
+		goto again;
+	}
+	if(achou == TRUE)
+	{
+		//printf("\n %s %i %i %i", aux->lexema,aux->cod,aux->tipo, escopo_aux);
+		op = TRUE;
+	}
+	fim_busca:
+	return op;
 }
 
 int declara_variavel(FILE * comp){
@@ -564,8 +675,11 @@ int declara_variavel(FILE * comp){
 
 int iteracao(FILE * comp){  // while "("<expr_relacional>")" <comando> | do <comando> while "("<expr_relacional>")"";"
 	cont = 0;
+	char * labbel;
 	if(verifica_iteracao(tk.cod) == TRUE){
 		if(tk.cod == PLR_WHILE){
+			labbel = gerador_de_label();
+			printf("%s: \n", labbel);
 			tk = Scanner(comp);
 			if(tk.cod == ABREPARENTESE){
 				tk = Scanner(comp);
@@ -588,6 +702,8 @@ int iteracao(FILE * comp){  // while "("<expr_relacional>")" <comando> | do <com
 				goto it_erro;
 			}
 		}else if(tk.cod == PLR_DO){
+			labbel = gerador_de_label();
+			printf("%s: \n", labbel);
 			tk = Scanner(comp);
 			if(comando(comp) == TRUE){
 				tk = Scanner(comp);
@@ -624,6 +740,7 @@ int iteracao(FILE * comp){  // while "("<expr_relacional>")" <comando> | do <com
 		}
 	}else{
 		it_erro:
+		free(labbel);
 		if(error == 1){
 			return FALSE;
 		}
@@ -631,14 +748,17 @@ int iteracao(FILE * comp){  // while "("<expr_relacional>")" <comando> | do <com
 		error = 1;
 		return FALSE;
 	}
+	free(labbel);
 }
 
 int atribuicao(FILE * comp){ // <id> "=" <expr_arit> ";"
-	Token aux, tk_aux;
+	Token aux, tk_aux, var_tk1;
+
 	int op;
 	//printf("\nATRIBUICAO\n");
-	tk_aux = tk;
-	if(tk_aux.cod == IDENTIFICADOR){
+	strcpy(var_tk1.lexema, "\0");
+	if(tk.cod == IDENTIFICADOR){
+		tk_aux = tk;
 		if(busca_na_tabela(&tk_aux) == FALSE){
 			printf("\nERRO na linha %i, coluna %i lexema %s: Erro de semantica, variavel nao encontrada no escopo.\n",linha, coluna-1, tk.lexema);
 			error = 1;
@@ -648,7 +768,18 @@ int atribuicao(FILE * comp){ // <id> "=" <expr_arit> ";"
 			if(tk.cod == IGUAL){
 				tk = Scanner(comp);
 				if(tk.cod == ABREPARENTESE ||tk.cod == IDENTIFICADOR ||tk.cod == VL_INT ||tk.cod == VL_FLOAT ||tk.cod == VL_CHAR){ //verifica_expr_arit(tk.tipo) == TRUE
-					top: aux  = expr_arit(comp);
+					atr_cont = 1;
+					top: aux  = expr_arit(comp, &var_tk1);
+					if(atr_cont == 0){
+						printf("%s = %s 1\n",tk_aux.lexema, var_tk1.lexema);
+					}
+					//printf("\n %s %i %i\n", aux.lexema, aux.cod, aux.tipo);
+					if(aux.cod != ERROR){
+						op = verifica_tipo_atr(tk_aux, aux);
+						if(op == FALSE){
+							goto at_erro;
+						}
+					}
 					if(error == 1){
 						goto at_erro;
 					}
@@ -677,10 +808,11 @@ int atribuicao(FILE * comp){ // <id> "=" <expr_arit> ";"
 		if(error == 1){
 			return FALSE;
 		}
-		printf("\nERRO: Atribuicao mal formada na linha %i, coluna %i.\n",linha, coluna-1);
+		printf("\nERRO: Atribuicao mal formada na linha %i, coluna %i. %s\n",linha, coluna-1, tk.lexema);
 		error = 1;
 		op = FALSE;
 	}
+	atr_cont = 0;
 	return op;
 }
 
@@ -688,11 +820,11 @@ Token expr_relacional(FILE * comp){ // <expr_arit> <op_relacional> <expr_arit>  
 	//printf("\n------ EXPRESSAO RELACIONAL ------\n");
 	fpos_t pos;
 	int aux;
-	Token tk_aux, aux1, aux2;
+	Token tk_aux, aux1, aux2, var_tk;
 
 	aux = verifica_fator(tk.cod);
 	if(aux == TRUE){
-		aux1 = expr_arit (comp);
+		aux1 = expr_arit (comp, &var_tk);
 		tk_aux = tk;
 		fgetpos(comp, &pos);
 		tk = Scanner(comp);
@@ -733,168 +865,347 @@ Token expr_relacional(FILE * comp){ // <expr_arit> <op_relacional> <expr_arit>  
 	return aux1;
 }
 
-Token expr_arit(FILE * comp){  // <termo><expr_arit2>
+Token expr_arit(FILE * comp, Token * tk1){  // <termo><expr_arit2>
 	//printf("\nEXPR_ARIT\n");
-    int aux , erro = 0;
-    fpos_t pos;
-    Token tk_aux, a1, a2;
-    if (error == 1){
-    	goto exp1_erro;
-    }
-    aux = verifica_fator(tk.cod);
-    if(aux == FALSE){
-        erro = 1;
-        goto exp1_erro;
-    }
-    a1 = termo(comp);
-    if(a1.cod == ERROR){
-        return a1;
-    }
-    tk_aux = tk;
-    fgetpos(comp, &pos);
-    tk = Scanner(comp);
-    a2 = expr_arit2(comp);
-    if(a2.cod != ERROR){
-        a1 = verifica_tipo_resultante(a1, a2);
-    }
-    else{
-        fsetpos(comp, &pos);
-        tk = tk_aux;
-        coluna = coluna -1;
-    }
-    exp1_erro:
-    if(error == 1){
-        a1.cod = ERROR;
-    }
-    if(erro == 1){
-        printf("\nERRO: Expressao Eritimetica mal formada na linha %i, coluna %i.\n",linha, coluna-1);
-        error = 1;
-        a1.cod = ERROR;
-    }
-    return a1;
+	int aux , erro = 0;
+	fpos_t pos;
+	Token tk_aux, a1, a2;
+
+	if (error == 1){
+		goto exp1_erro;
+	}
+	aux = verifica_fator(tk.cod);
+	if(aux == FALSE){
+		erro = 1;
+		goto exp1_erro;
+	}
+	a1 = termo(comp, &(*tk1));
+	termo_int = 0;
+	//termo_check = 0;
+	if(a1.cod == ERROR){
+		return a1;
+	}
+	tk_aux = tk;
+	fgetpos(comp, &pos);
+	tk = Scanner(comp);
+	a2 = expr_arit2(comp, &(*tk1));
+	if(a2.cod != ERROR){
+		a1 = verifica_tipo_resultante(a1, a2);
+
+	}
+	else{
+		atr_cont = 0;
+		fsetpos(comp, &pos);
+		tk = tk_aux;
+		coluna = coluna -1;
+	}
+	exp1_erro:
+	if(error == 1){
+		a1.cod = ERROR;
+	}
+	if(erro == 1){
+		printf("\nERRO: Expressao Eritimetica mal formada na linha %i, coluna %i.\n",linha, coluna-1);
+		error = 1;
+		a1.cod = ERROR;
+	}
+	//printf("\nFator check %i.\n",fator_check);
+	if(fator_check == 1){
+		strcpy(g_tmp_var.lexema,tk1->lexema);
+		g_tmp_var.cod = tk1->cod;
+		g_tmp_var.tipo = tk1->tipo;
+	}
+	strcpy(tk1->lexema,a1.lexema);
+	tk1->cod = a1.cod;
+	tk1->tipo = a1.tipo;
+	return a1;
 }
 
-Token expr_arit2(FILE * comp){  // "+" <termo><expr_arit2>   |"-" <termo><expr_arit2> | VAZIO
-    fpos_t pos;
-    Token tk_aux, aux1 ,aux2;
-    //printf("\nEXPR_ARIT2\n");
-    if(tk.cod == MAIS || tk.cod == MENOS){
-        //operador[op_count] = tk.cod;
-        //op_count++;
-        tk = Scanner(comp);
-        aux1 = termo(comp);
-        tk_aux = tk;
-        fgetpos(comp, &pos);
-        tk = Scanner(comp);
-        aux2 = expr_arit2(comp);
-        if(aux2.cod != ERROR){
-            aux1 = verifica_tipo_resultante(aux1, aux2);
-        }
-        else{
-            fsetpos(comp, &pos);
-            tk = tk_aux;
-            coluna = coluna -1;
-            goto end;
-        }
-        tk_aux = tk;
-        fgetpos(comp, &pos);
-        tk = Scanner(comp);
-        if(tk.cod != MAIS || tk.cod != MENOS ){
-            fsetpos(comp, &pos);
-            tk = tk_aux;
-            coluna = coluna -1;
-        }
-    }else {
-        aux1.cod = ERROR;
-    }
-    end:
-    return aux1;
+Token expr_arit2(FILE * comp, Token * tk1){  // "+" <termo><expr_arit2>   |"-" <termo><expr_arit2> | VAZIO
+	fpos_t pos;
+	int op;
+	Token tk_aux, aux1 ,aux2;
+	char * var_tmp, lex_tmp[TAM];
+	//printf("\nEXPR_ARIT2\n");
+	if(tk.cod == MAIS || tk.cod == MENOS){
+		op = tk.cod;
+
+		strcpy(lex_tmp,tk1->lexema);
+		if(strlen(tk1->lexema) == 0){
+			strcpy(lex_tmp,tk1->lexema);
+		}
+
+
+		tk = Scanner(comp);
+		aux1 = termo(comp, &(*tk1));
+
+		//printf("\n TC : %i %i\n",termo_check, fator_check);
+
+		if(fator_cont == 0){
+			termo_check = 0;
+			fator_check = 0;
+		}
+		//printf("aux1:%s\n",aux1.lexema);
+		//printf("tk1:%s\n",tk1->lexema);
+		var_tmp = gerador_de_var_tmp();
+		//printf("fg:%i\n",flag_print);
+		if(aux1.cod != ERROR){
+			if(flag_print == 1){
+				flag_print =0;
+				if(op == MAIS){
+					printf("%s = %s + %s 1\n",var_tmp, lex_tmp, aux1.lexema);
+				} else{
+					printf("%s = %s - %s 2\n",var_tmp, lex_tmp, aux1.lexema);
+				}
+			}else{
+				if(op == MAIS){
+					printf("%s = %s + %s 3\n",var_tmp, lex_tmp, tk1->lexema);
+				} else{
+					printf("%s = %s - %s 4\n",var_tmp, lex_tmp, tk1->lexema);
+				}
+			}
+			//termo_check = 0;
+			strcpy(tk1->lexema,var_tmp);
+		}else{
+			free(var_tmp);
+			goto end;
+		}
+		free(var_tmp);
+		tk_aux = tk;
+		fgetpos(comp, &pos);
+		tk = Scanner(comp);
+		aux2 = expr_arit2(comp, &(*tk1));
+		if(aux2.cod != ERROR){
+			//var_tmp = gerador_de_var_tmp();
+			//aux11 = aux1;
+			aux1 = verifica_tipo_resultante(aux1, aux2);
+			/*if(aux1.cod == ERROR){
+        		free(var_tmp);
+        		goto end;
+        	}
+        	if(strlen(tk1->lexema) != 0){
+        		var_tk2 = var_tk1;
+        	}else{
+        		strcpy(var_tk1.lexema ,tk1->lexema);
+        		var_tk1.cod = tk1->cod;
+        		var_tk1.tipo = tk1->tipo;
+        		goto print;
+        	}
+        	strcpy(var_tk1.lexema, var_tmp);
+        	var_tk1.cod = TMP;
+        	if(aux1.cod == IDENTIFICADOR){
+        		var_tk1.tipo = aux1.tipo;
+        	}
+        	else{
+        		var_tk1.tipo = aux1.cod;
+        	}
+        	print:
+        	if(exp_cont == 0){
+        		if(op_atual == MAIS){
+        			printf("%s = %s + %s \n",var_tk1.lexema, aux11.lexema, aux2.lexema);
+        		} else{
+        			printf("%s = %s - %s \n",var_tk1.lexema, aux11.lexema, aux2.lexema);
+        		}
+        	}else{
+        		if(op_atual == MAIS){
+        			printf("%s = %s + %s \n",var_tk1.lexema, var_tk2.lexema, aux2.lexema);
+        		} else{
+        			printf("%s = %s - %s \n",var_tk1.lexema, var_tk2.lexema, aux2.lexema);
+        		}
+        	}
+        	exp_cont++;
+        	free(var_tmp);*/
+		}
+		else{
+			fsetpos(comp, &pos);
+			tk = tk_aux;
+			coluna = coluna -1;
+			goto end;
+		}
+		termo_int = 0;
+		/*tk_aux = tk;
+		fgetpos(comp, &pos);
+		tk = Scanner(comp);
+		if(tk.cod != MAIS || tk.cod != MENOS ){
+			fsetpos(comp, &pos);
+			tk = tk_aux;
+			coluna = coluna -1;
+		}*/
+	}else {
+		aux1.cod = ERROR;
+	}
+	end:
+	termo_int = 0;
+	return aux1;
 }
 
-Token termo(FILE * comp){  // <termo> "*" <fator> | <termo> “/” <fator> | <fator>
+Token termo(FILE * comp , Token * tk1){  // <termo> "*" <fator> | <termo> “/” <fator> | <fator>
 	//printf("\nTERMO\n");
-	int aux;
-    fpos_t pos;
-    Token tk_aux, aux1, aux2;
-    aux = verifica_fator(tk.cod); //ATUAL
-    if (aux == TRUE){
-        aux1 = fator(comp);// (p)
-    }
-     else{
-        aux1.cod = ERROR;
-    }
-    if(aux1.cod != ERROR){
-        if(aux1.cod == IDENTIFICADOR){
-            if(busca_na_tabela(&aux1) == FALSE){
-                aux1.cod = ERROR;
-                return aux1;
-            }
-        }
-        tk_aux = tk;
-        fgetpos(comp, &pos);
-        tk = Scanner(comp);
-        if(tk.cod == MULT || tk.cod == BARRA){
-            while(tk.cod == MULT || tk.cod == BARRA){
-                tk = Scanner(comp);
-                aux2 = fator(comp);
-                if(aux2.cod != ERROR){
-                    if(aux2.cod == IDENTIFICADOR){
-                        if(busca_na_tabela(&aux2) == FALSE){
-                            aux2.cod = ERROR;
-                            return aux2;
-                        }
-                    }
-                    aux1 = verifica_tipo_resultante(aux1, aux2);
-                    if(aux1.cod == ERROR){
-                       goto ea_erro;
-                    }
-                }
-                else{
-                    fsetpos(comp, &pos);
-                    tk = tk_aux;
-                    coluna = coluna -1;
-                    goto ea_erro;
-                }
-                tk_aux = tk;
-                fgetpos(comp, &pos);
-                tk = Scanner(comp);
-                if(tk.cod != MULT && tk.cod != BARRA){
-                    fsetpos(comp, &pos);
-                    tk = tk_aux;
-                    coluna = coluna -1;
-                }
-            }
-        }
-        else{
-        fsetpos(comp, &pos);
-        tk = tk_aux;
-        coluna = coluna -1;
-        }
-    }else{
-        ea_erro:
-        if(error == 1){
-            aux1.cod = ERROR;
-            return aux1;
-        }
-        printf("\nERRO: Expressao Eritimetica mal formada na linha %i, coluna %i.\n",linha, coluna-1);
-        error = 1;
-    }
-    return aux1;
+	int aux, exp_cont = 0;
+	fpos_t pos;
+	Token tk_aux, aux1, aux11, aux2, var_tk2;
+	char * var_tmp, lex_aux[TAM] = "\0";
+	aux = verifica_fator(tk.cod); //ATUA
+	termo_int = 1;
+	if (aux == TRUE){
+		aux1 = fator(comp, &(*tk1));// (p)
+		//printf("\nVerifica G: %s \n",g_tmp_var.lexema);
+		//printf("\nVerifica aux: %s \n",aux1.lexema);
+		//printf("\nVerificaL G: %i ",strlen(g_tmp_var.lexema));
+		//printf("\nVerifica TK:%s \n",tk1->lexema);
+		if(strlen(tk1->lexema) != 0){
+			//strcpy(tk1->lexema,g_tmp_var.lexema);
+			strcpy(lex_aux,tk1->lexema);
+			//tk1->cod = g_tmp_var.cod;
+			//tk1->tipo = g_tmp_var.tipo;
+			//printf("\nVerifica TK2:%s \n",tk1->lexema);
+			//strcpy(g_tmp_var.lexema, "");
+			//printf("\nVerifica G: %s ",g_tmp_var.lexema);
+			//printf("\nVerifica TK:%s \n",tk1->lexema);
+		}else{
+			strcpy(tk1->lexema, aux1.lexema);
+			tk1->cod = TMP;
+			tk1->tipo = aux1.tipo;
+		}
+
+	}
+	else{
+		aux1.cod = ERROR;
+	}
+	if(aux1.cod != ERROR){
+		if(aux1.cod == IDENTIFICADOR){
+			if(busca_na_tabela(&aux1) == FALSE){
+				aux1.cod = ERROR;
+				return aux1;
+			}
+		}
+		//printf("verifica f:%s\n", aux1.lexema );
+		tk_aux = tk;
+		fgetpos(comp, &pos);
+		tk = Scanner(comp);
+		if(tk.cod == MULT || tk.cod == BARRA){
+			while(tk.cod == MULT || tk.cod == BARRA){
+				termo_check = 1;
+				op_atual = tk.cod;
+				if(op_atual == BARRA && aux1.cod == VL_INT){
+					covert_to_float(&aux1);
+				}
+				tk = Scanner(comp);
+				aux2 = fator(comp, &(*tk1));
+				if(aux2.cod != ERROR){
+					if(aux2.cod == IDENTIFICADOR){
+						if(busca_na_tabela(&aux2) == FALSE){
+							aux2.cod = ERROR;
+							return aux2;
+						}
+					}
+					var_tmp = gerador_de_var_tmp();
+					aux11 = aux1;
+					//printf("verifica f:%s\n", aux11.lexema );
+					aux1 = verifica_tipo_resultante(aux1, aux2);
+					if(aux1.cod == ERROR){
+						free(var_tmp);
+						goto ea_erro;
+					}
+					if(strlen(tk1->lexema) != 0 ){
+						strcpy(var_tk2.lexema ,tk1->lexema);
+						var_tk2.cod = tk1->cod;
+						var_tk2.tipo = tk1->tipo;
+						//goto print;
+					}
+					strcpy(tk1->lexema, var_tmp);
+					tk1->cod = TMP;
+					if(aux1.cod == IDENTIFICADOR){
+						tk1->tipo = aux1.tipo;
+					}
+					else{
+						tk1->tipo = aux1.cod;
+					}
+					if(exp_cont == 0 && strlen(lex_aux) == 0){
+						if(op_atual == MULT){
+							printf("%s = %s * %s p1\n",tk1->lexema, aux11.lexema, aux2.lexema);
+						} else{
+							printf("%s = %s / %s p2\n",tk1->lexema, aux11.lexema, aux2.lexema);
+						}
+					}else{
+						if(op_atual == MULT){
+							printf("%s = %s * %s p3\n",tk1->lexema, var_tk2.lexema, aux2.lexema);
+						} else{
+							printf("%s = %s / %s p4\n",tk1->lexema, var_tk2.lexema, aux2.lexema);
+						}
+					}
+					exp_cont++;
+					free(var_tmp);
+				}
+				else{
+					fsetpos(comp, &pos);
+					tk = tk_aux;
+					coluna = coluna - 1;
+					goto ea_erro;
+				}
+				tk_aux = tk;
+				fgetpos(comp, &pos);
+				tk = Scanner(comp);
+				if(tk.cod != MULT && tk.cod != BARRA){
+					fsetpos(comp, &pos);
+					tk = tk_aux;
+					coluna = coluna - 1;
+				}
+			}
+
+		}
+		else{
+			//flag_print = 1;
+
+			//printf("\n %s : c:%i  t:%i \n",tk1->lexema, tk1->cod, tk1->tipo);
+			//system("pause");
+			fsetpos(comp, &pos);
+			tk = tk_aux;
+			coluna = coluna - 1;
+		}
+	}else{
+		ea_erro:
+		if(error == 1){
+			aux1.cod = ERROR;
+			return aux1;
+		}
+		printf("\nERRO: Termo mal formado na linha %i, coluna %i.\n",linha, coluna-1);
+		error = 1;
+	}
+	//printf("cont %i\n",exp_cont);
+	if(tk1->cod == TMP ){
+		//printf("\n TC : %i %i\n",termo_check, fator_check);
+		if(fator_check == 1 && termo_check == 1){
+			flag_print = 0;
+		}else{
+			flag_print = 1;
+		}
+
+	}
+	else{
+		strcpy(tk1->lexema,aux1.lexema);
+		tk1->cod = aux1.cod;
+		tk1->tipo = aux1.tipo;
+	}
+	return aux1;
 }
 
-Token fator(FILE * comp){  // “(“ <expr_arit> “)” | <id> | <real> | <inteiro> | <char>
+Token fator(FILE * comp, Token *tk1){  // “(“ <expr_arit> “)” | <id> | <real> | <inteiro> | <char>
 	//printf("\nFATOR\n");
 	Token aux;
 	if(verifica_fator(tk.cod) == TRUE){
+		fator_cont++;
 		if(tk.cod == ABREPARENTESE){
 			tk = Scanner(comp);
 			if(verifica_fator(tk.cod) == TRUE){
-				aux = expr_arit(comp);
+				fator_check = 1;
+				aux = expr_arit(comp, &(*tk1));
 				tk = Scanner(comp);
 				if(error == 1){
 					goto fterro;
 				}
 				if(tk.cod == FECHAPARENTESE && aux.cod != ERROR){
+					fator_cont--;
+
 					return aux;
 				}else{
 					goto fterro;
@@ -906,7 +1217,7 @@ Token fator(FILE * comp){  // “(“ <expr_arit> “)” | <id> | <real> | <inteiro> | 
 			goto fim_fat;
 		}
 	}else{
-fterro:	if (error == 1){
+		fterro:	if (error == 1){
 			tk.cod = ERROR;
 			return tk;
 		}
@@ -916,6 +1227,7 @@ fterro:	if (error == 1){
 	}
 
 	fim_fat:
+	fator_cont--;
 	return tk;
 }
 
@@ -1053,7 +1365,7 @@ int bloco(FILE * comp){  // <comando_básico> | <iteração> | if "("<expr_relacion
 	}
 	else{
 
-b_erro:	if(error == 1){
+		b_erro:	if(error == 1){
 			return FALSE;
 		}
 		printf("\nERRO: Bloco mal formado na linha %i, coluna %i.\n",linha, coluna-1);
@@ -1065,7 +1377,7 @@ b_erro:	if(error == 1){
 
 Token Scanner(FILE * comp){
 	static char c = ' ';
-    int s_cont, cont_pontos = 0;
+	int s_cont, cont_pontos = 0;
 	tk.cod = 0;
 	tk.lexema[0] = '\0';
 	//error = 0;
@@ -1220,7 +1532,7 @@ Token Scanner(FILE * comp){
 		{
 			c = fgetc(comp);
 			coluna = coluna + 1;//conta_coluna(coluna);
-			 if(tk.lexema[s_cont] =='.' && !isdigit(c)) //EX: SE .a
+			if(tk.lexema[s_cont] =='.' && !isdigit(c)) //EX: SE .a
 			{
 				printf("\nERRO na linha %i, coluna %i, ultimo token lido %i %s: Float mal formado.\n", linha, coluna-1, tk.cod, tk.lexema); //TERMINAR
 				error = 1;
@@ -1241,7 +1553,7 @@ Token Scanner(FILE * comp){
 				break;
 			}else if(!isdigit(c)) // VERIFICA SE NAO E DIGITO(INCLUSIVE ESPACO)
 			{
-			dot:tk.lexema[s_cont+1] = '\0';
+				dot:tk.lexema[s_cont+1] = '\0';
 				coluna = coluna-1;
 				ungetc(c, comp);
 				break;
