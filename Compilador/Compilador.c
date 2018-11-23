@@ -4,6 +4,7 @@
 int linha;
 int coluna;
 int error;
+int opR_aux, expR_check = 0;
 int cont, label_cont = 0, tmp_cont = 0, atr_cont = 0;
 int dec_var;
 int op_atual;
@@ -488,7 +489,7 @@ Symbol * fim_lista(){
 void preencher_tabela(Token t){
 
 	if(tabela == NULL){
-		tabela = malloc (sizeof (Symbol));
+		tabela =(Symbol *) malloc (sizeof (Symbol));
 		tabela->prox = NULL;
 		strcpy(tabela->lexema, t.lexema);
 		tabela->tipo = t.tipo;
@@ -502,7 +503,7 @@ void preencher_tabela(Token t){
 	else{
 		Symbol *nova, *p;
 		p = fim_lista();
-		nova = malloc (sizeof (Symbol));
+		nova =(Symbol *) malloc (sizeof (Symbol));
 		nova->tipo = t.tipo;
 		strcpy(nova->lexema, t.lexema);
 		nova->escopo = escopo;
@@ -526,7 +527,7 @@ void destruir_escopo(){
 	while(p != NULL){
 		if(p->escopo != escopo){
 			if(aux1 == NULL){
-				nova = malloc (sizeof (Symbol));
+				nova =(Symbol *) malloc (sizeof (Symbol));
 				nova->tipo = p->tipo;
 				strcpy(nova->lexema, p->lexema);
 				nova->escopo = p->escopo;
@@ -536,7 +537,7 @@ void destruir_escopo(){
 
 			}
 			else if(aux1->prox == NULL){
-				nova = malloc (sizeof (Symbol));
+				nova =(Symbol *) malloc (sizeof (Symbol));
 				nova->tipo = p->tipo;
 				strcpy(nova->lexema, p->lexema);
 				nova->escopo = p->escopo;
@@ -547,7 +548,7 @@ void destruir_escopo(){
 
 			}
 			else{
-				nova = malloc (sizeof (Symbol));
+				nova =(Symbol *) malloc (sizeof (Symbol));
 				nova->tipo = p->tipo;
 				strcpy(nova->lexema, p->lexema);
 				nova->escopo = p->escopo;
@@ -674,20 +675,34 @@ int declara_variavel(FILE * comp){
 }
 
 int iteracao(FILE * comp){  // while "("<expr_relacional>")" <comando> | do <comando> while "("<expr_relacional>")"";"
-	cont = 0;
+	
 	char * labbel;
+	char labbel_aux1[3], labbel_aux2[3];	
+	Token tk_it;
+	cont = 0;
 	if(verifica_iteracao(tk.cod) == TRUE){
 		if(tk.cod == PLR_WHILE){
 			labbel = gerador_de_label();
-			printf("%s: \n", labbel);
+			strcpy(labbel_aux1, labbel);
+			free(labbel);
+			printf("%s: \n", labbel_aux1);			
 			tk = Scanner(comp);
 			if(tk.cod == ABREPARENTESE){
 				tk = Scanner(comp);
-				if(expr_relacional(comp).cod != ERROR){
+				tk_it = expr_relacional(comp);
+				
+				if(tk_it.cod!= ERROR){
+					labbel = gerador_de_label();
+					strcpy(labbel_aux2, labbel);
+					free(labbel);
+					printf("if %s == 0 goto %s\n",tk_it.lexema, labbel_aux2);
+					
 					tk = Scanner(comp);
 					if(tk.cod == FECHAPARENTESE){
 						tk = Scanner(comp);
 						if(comando(comp) == TRUE){
+							printf("goto %s\n",labbel_aux1);
+							printf("%s: \n", labbel_aux2);
 							return TRUE;
 						}else{
 							goto it_erro;
@@ -703,7 +718,9 @@ int iteracao(FILE * comp){  // while "("<expr_relacional>")" <comando> | do <com
 			}
 		}else if(tk.cod == PLR_DO){
 			labbel = gerador_de_label();
-			printf("%s: \n", labbel);
+			strcpy(labbel_aux1, labbel);
+			free(labbel);
+			printf("%s: \n", labbel_aux1);
 			tk = Scanner(comp);
 			if(comando(comp) == TRUE){
 				tk = Scanner(comp);
@@ -711,7 +728,9 @@ int iteracao(FILE * comp){  // while "("<expr_relacional>")" <comando> | do <com
 					tk = Scanner(comp);
 					if(tk.cod == ABREPARENTESE){
 						tk = Scanner(comp);
-						if(expr_relacional(comp).cod != ERROR){
+						tk_it = expr_relacional(comp);
+						if(tk_it.cod != ERROR){
+							printf("if %s != 0 goto %s\n",tk_it.lexema, labbel_aux1);
 							tk = Scanner(comp);
 							if(tk.cod == FECHAPARENTESE){
 								tk = Scanner(comp);
@@ -740,7 +759,6 @@ int iteracao(FILE * comp){  // while "("<expr_relacional>")" <comando> | do <com
 		}
 	}else{
 		it_erro:
-		free(labbel);
 		if(error == 1){
 			return FALSE;
 		}
@@ -748,7 +766,7 @@ int iteracao(FILE * comp){  // while "("<expr_relacional>")" <comando> | do <com
 		error = 1;
 		return FALSE;
 	}
-	free(labbel);
+
 }
 
 int atribuicao(FILE * comp){ // <id> "=" <expr_arit> ";"
@@ -768,10 +786,9 @@ int atribuicao(FILE * comp){ // <id> "=" <expr_arit> ";"
 			if(tk.cod == IGUAL){
 				tk = Scanner(comp);
 				if(tk.cod == ABREPARENTESE ||tk.cod == IDENTIFICADOR ||tk.cod == VL_INT ||tk.cod == VL_FLOAT ||tk.cod == VL_CHAR){ //verifica_expr_arit(tk.tipo) == TRUE
-					atr_cont = 1;
 					top: aux  = expr_arit(comp, &var_tk1);
 					if(atr_cont == 0){
-						printf("%s = %s 1\n",tk_aux.lexema, var_tk1.lexema);
+						printf("%s = %s \n",tk_aux.lexema, var_tk1.lexema);
 					}
 					//printf("\n %s %i %i\n", aux.lexema, aux.cod, aux.tipo);
 					if(aux.cod != ERROR){
@@ -806,6 +823,7 @@ int atribuicao(FILE * comp){ // <id> "=" <expr_arit> ";"
 	}else{
 		at_erro:
 		if(error == 1){
+			atr_cont = 0;
 			return FALSE;
 		}
 		printf("\nERRO: Atribuicao mal formada na linha %i, coluna %i. %s\n",linha, coluna-1, tk.lexema);
@@ -821,9 +839,14 @@ Token expr_relacional(FILE * comp){ // <expr_arit> <op_relacional> <expr_arit>  
 	fpos_t pos;
 	int aux;
 	Token tk_aux, aux1, aux2, var_tk;
-
+	char * var_tmp = '\0';
+	strcpy(var_tk.lexema, "\0");
+	
+	//strcpy(var_tmp, "\0");
+	//system("pause");
 	aux = verifica_fator(tk.cod);
 	if(aux == TRUE){
+		expR_check = 1;
 		aux1 = expr_arit (comp, &var_tk);
 		tk_aux = tk;
 		fgetpos(comp, &pos);
@@ -833,7 +856,30 @@ Token expr_relacional(FILE * comp){ // <expr_arit> <op_relacional> <expr_arit>  
 				fsetpos(comp, &pos);
 				tk = tk_aux;
 				coluna = coluna -1;
+				strcpy(aux1.lexema,var_tk.lexema);
+				aux1.cod = var_tk.cod;
+				aux1.tipo = var_tk.tipo;
 			}else if(verifica_op_relacional(tk.cod) == TRUE && cont == 0){
+				//tipos_relacionail [6][6] = {"<", ">", "<=", ">=", "==", "!=" };
+				if(tk.cod == MENORQ){
+					opR_aux = 0;
+				}
+				else if(tk.cod == MAIORQ){
+					opR_aux = 1;
+				}
+				else if(tk.cod == MENORIGUAL){
+					opR_aux = 2;
+				}
+				else if(tk.cod == MAIORIGUAL){
+					opR_aux = 3;
+				}
+				else if(tk.cod == IGUALIGUAL){
+
+					opR_aux = 4;
+				}
+				else{
+					opR_aux = 5;
+				}
 				cont++;
 				tk = Scanner(comp);
 				aux2 = expr_relacional(comp);
@@ -842,6 +888,8 @@ Token expr_relacional(FILE * comp){ // <expr_arit> <op_relacional> <expr_arit>  
 					if(aux1.cod == ERROR){
 						goto er_erro;
 					}
+					var_tmp = gerador_de_var_tmp();
+					printf("%s = %s %s %s \n",var_tmp, var_tk.lexema, tipos_relacionail[opR_aux], aux2.lexema);
 				}
 				else{
 					goto er_erro;
@@ -855,13 +903,24 @@ Token expr_relacional(FILE * comp){ // <expr_arit> <op_relacional> <expr_arit>  
 	}else{
 		er_erro:
 		if(error == 1){
+			expR_check = 0;
 			aux1.cod = ERROR;
+			if(var_tmp != '\0'){
+				free(var_tmp);
+			}
 			return aux1;
 		}
 		printf("\nERRO: Operacao relacional mal formado na linha %i, coluna %i.\n",linha, coluna-1);
 		error = 1;
 		aux1.cod = ERROR;
 	}
+	expR_check = 0;
+	if(var_tmp != '\0'){
+		strcpy(aux1.lexema,var_tmp);
+		aux1.cod = TMP;
+		aux1.tipo = 0;
+	}
+	free(var_tmp);
 	return aux1;
 }
 
@@ -890,11 +949,12 @@ Token expr_arit(FILE * comp, Token * tk1){  // <termo><expr_arit2>
 	tk = Scanner(comp);
 	a2 = expr_arit2(comp, &(*tk1));
 	if(a2.cod != ERROR){
+		atr_cont = 1;
 		a1 = verifica_tipo_resultante(a1, a2);
 
 	}
 	else{
-		atr_cont = 0;
+		
 		fsetpos(comp, &pos);
 		tk = tk_aux;
 		coluna = coluna -1;
@@ -908,15 +968,19 @@ Token expr_arit(FILE * comp, Token * tk1){  // <termo><expr_arit2>
 		error = 1;
 		a1.cod = ERROR;
 	}
-	//printf("\nFator check %i.\n",fator_check);
+	//printf("\nTK_LEX %s.\n",tk1->lexema);
 	if(fator_check == 1){
 		strcpy(g_tmp_var.lexema,tk1->lexema);
 		g_tmp_var.cod = tk1->cod;
 		g_tmp_var.tipo = tk1->tipo;
+		goto fim_ear;
 	}
-	strcpy(tk1->lexema,a1.lexema);
-	tk1->cod = a1.cod;
-	tk1->tipo = a1.tipo;
+	if(expR_check == 0){
+	    strcpy(tk1->lexema,a1.lexema);
+		tk1->cod = a1.cod;
+		tk1->tipo = a1.tipo;
+	}
+	fim_ear:
 	return a1;
 }
 
@@ -936,6 +1000,9 @@ Token expr_arit2(FILE * comp, Token * tk1){  // "+" <termo><expr_arit2>   |"-" <
 
 
 		tk = Scanner(comp);
+		strcpy(tk1->lexema, "\0");
+		tk1->cod = 0;
+		tk1->tipo = 0;
 		aux1 = termo(comp, &(*tk1));
 
 		//printf("\n TC : %i %i\n",termo_check, fator_check);
@@ -1038,7 +1105,7 @@ Token expr_arit2(FILE * comp, Token * tk1){  // "+" <termo><expr_arit2>   |"-" <
 	return aux1;
 }
 
-Token termo(FILE * comp , Token * tk1){  // <termo> "*" <fator> | <termo> “/” <fator> | <fator>
+Token termo(FILE * comp , Token * tk1){  // <termo> "*" <fator> | <termo> Â“/Â” <fator> | <fator>
 	//printf("\nTERMO\n");
 	int aux, exp_cont = 0;
 	fpos_t pos;
@@ -1083,6 +1150,7 @@ Token termo(FILE * comp , Token * tk1){  // <termo> "*" <fator> | <termo> “/” <f
 		fgetpos(comp, &pos);
 		tk = Scanner(comp);
 		if(tk.cod == MULT || tk.cod == BARRA){
+			atr_cont = 1;
 			while(tk.cod == MULT || tk.cod == BARRA){
 				termo_check = 1;
 				op_atual = tk.cod;
@@ -1189,7 +1257,7 @@ Token termo(FILE * comp , Token * tk1){  // <termo> "*" <fator> | <termo> “/” <f
 	return aux1;
 }
 
-Token fator(FILE * comp, Token *tk1){  // “(“ <expr_arit> “)” | <id> | <real> | <inteiro> | <char>
+Token fator(FILE * comp, Token *tk1){  // Â“(Â“ <expr_arit> Â“)Â” | <id> | <real> | <inteiro> | <char>
 	//printf("\nFATOR\n");
 	Token aux;
 	if(verifica_fator(tk.cod) == TRUE){
@@ -1231,7 +1299,7 @@ Token fator(FILE * comp, Token *tk1){  // “(“ <expr_arit> “)” | <id> | <real> | 
 	return tk;
 }
 
-int comando_basico(FILE * comp){  // <atribuição> | <bloco>
+int comando_basico(FILE * comp){  // <atribuiÃ§Ã£o> | <bloco>
 	if(verifica_atribuicao(tk.cod) == TRUE){
 		if(atribuicao(comp) == TRUE){
 			return TRUE;
@@ -1257,7 +1325,10 @@ int comando_basico(FILE * comp){  // <atribuição> | <bloco>
 	}
 }
 
-int comando(FILE * comp){  // <comando_básico> | <iteração> | if "("<expr_relacional>")" <comando> {else <comando>}?
+int comando(FILE * comp){  // <comando_bÃ¡sico> | <iteraÃ§Ã£o> | if "("<expr_relacional>")" <comando> {else <comando>}?
+	char * labbel;
+	char labbel_aux1[3], labbel_aux2[3];	
+	Token tk_it;
 	fpos_t position;
 	cont = 0;
 	if(verifica_comando(tk.cod) == TRUE){
@@ -1277,21 +1348,34 @@ int comando(FILE * comp){  // <comando_básico> | <iteração> | if "("<expr_relaci
 			tk = Scanner(comp);
 			if(tk.cod == ABREPARENTESE){
 				tk = Scanner(comp);
-				if(expr_relacional(comp).cod != ERROR){
+				tk_it = expr_relacional(comp);
+				if(tk_it.cod != ERROR){
+					labbel = gerador_de_label();
+					strcpy(labbel_aux1, labbel);
+					free(labbel);
+					printf("if %s == 0 goto %s\n",tk_it.lexema, labbel_aux1);
 					tk = Scanner(comp);
 					if(tk.cod == FECHAPARENTESE){
 						tk = Scanner(comp);
 						if(comando(comp) == TRUE){
+							
 							fgetpos(comp, &position);
 							tk = Scanner(comp);
 							if(tk.cod == PLR_ELSE){
+								labbel = gerador_de_label();
+								strcpy(labbel_aux2, labbel);
+								free(labbel);
+								printf("goto %s\n", labbel_aux2);
+								printf("%s: \n", labbel_aux1);
 								tk = Scanner(comp);
 								if(comando(comp) == TRUE){
+									printf("%s: \n", labbel_aux2);
 									return TRUE;
 								}else{
 									goto c_erro;
 								}
 							}else{
+								printf("%s: \n", labbel_aux1);
 								fsetpos(comp, &position);
 								coluna = coluna -1;
 								return TRUE;
@@ -1323,7 +1407,7 @@ int comando(FILE * comp){  // <comando_básico> | <iteração> | if "("<expr_relaci
 
 }
 
-int bloco(FILE * comp){  // <comando_básico> | <iteração> | if "("<expr_relacional>")" <comando> {else <comando>}?
+int bloco(FILE * comp){  // <comando_bÃ¡sico> | <iteraÃ§Ã£o> | if "("<expr_relacional>")" <comando> {else <comando>}?
 
 	if(tk.cod == ABRECHAVE){
 		escopo++;
